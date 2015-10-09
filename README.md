@@ -7,6 +7,6 @@ Sumo wrestler lab for a microcontrollers
 
 *The report should go here*
 
-![](flow.png)
+![](Flow.png)
 ![](tek0001.png)
 ![](tek0002.png)
