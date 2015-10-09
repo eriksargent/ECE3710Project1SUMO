@@ -3,15 +3,6 @@
        ALIGN          
        AREA    |.text|, CODE, READONLY, ALIGN=2
        EXPORT  Start
-	   ;unlock 0x4C4F434B
-	   
-	   ;PF4 is SW1
-	   ;PF0 is SW2
-	   ;PF1 is RGB Red
-	   ;Enable Clock RCGCGPIO p338
-	   ;Set direction 1 is out 0 is in. GPIODIR
-	   ;DEN 
-	   ; 0x3FC
 	   
 PA EQU 0x40004000
 PB EQU 0x40005000
@@ -26,19 +17,24 @@ RCGC2 EQU 0x400FE108
 
 
 Start  
-	; set up clock
-	LDR R1,=RCGC2
-	LDR R0,=0x3B
-	STR R0,[R1]
+	; Set up clock for the GPIO
+	LDR R1, =RCGC2
+	LDR R0, =0x3B
+	STR R0, [R1]
 	
-	ldr R1,=0x400FE000
-	mov R0,#0x4
-	strb R0,[R1,#0x106]
+    ; Set up the clock for the GPTM
+	ldr R1, =0x400FE000
+	mov R0, #0x4
+	strb R0, [R1, #0x106]
 	
+    ; Wait a few clock cycles
 	NOP
 	NOP
 	
-	
+    
+    ; GPIO Ports A, B, and E are used for outputs to the light segments
+    ; GPIO Port D is used for inputs from the buttons and the DIP switches
+
 	; Port B Configuration
 	LDR R1, =PB
 	; Disable alternative functionality
@@ -109,8 +105,11 @@ Start
 	; Enable
 	MOV R0, #0x1F
 	STR R0, [R1, #0x51C]
-	
-	; Timer2
+
+	; Timer 2
+    ; Timer 2 is set up with 2 different 16 bit timers
+    ; One is used for timing between the two button presses for the random delay
+    ; And the other is used as a 5ms timer for checking the buttons 
 	LDR R1, =T2
 	; Stop timer
 	MOV R0, #0x0
@@ -126,100 +125,124 @@ Start
 	STR R0, [R1, #0x8]
 	
 	
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-		
-	;load R2 and R3 with on and off values for the LEDs
+	; Load R5 and R6 with the off values for the LEDs
 	MOV R5, #0x0; LED 5 off state
 	MOV R6, #0x0; LED 6 off state
 		
-Flash;reset was just pressed
+Flash ; Reset was just pressed
 	MOV R2, #0x10; turn on led 5
 	MOV R3, #0x20; turn on led 6
 	BL SetLEDs
-		
+	
 	BL Timer2
 		
-	MOV R2, R5; turn them off
+	MOV R2, R5 ; turn them off
 	MOV R3, R6
 	BL SetLEDs
 	
 	BL Timer2
 	
+    ; If both R5 and R6 have been set to the on state, then we are done in the pre-game state, so start playing
 	ORR R7, R5, R6
 	CMP R7, #0x30
 	BNE Flash
+
 	B StartGame
     
 
+; 5ms Timer for checking buttons
 Timer5
 	LDR R1, =T2
-	LDR R0, =DELAY5		;the number of iterations 8000
+    ; Set the delay
+	LDR R0, =DELAY5		
 	STR R0, [R1, #0x2C]
-	MOV R0, #0x100				;start timer
+    ; Start the timer
+	MOV R0, #0x100
 	STR R0, [R1, #0xC]
 	
 Tloop5
+    ; Check for the timer finishing
 	LDR R1, =T2
-	LDRB R10, [R1, #0x1D]		;load time in to see if it is ready yet
+	LDRB R10, [R1, #0x1D]
 	MOV R0, #0x1
-	CMP R0, R10		;check to see if 1
+	CMP R0, R10
 	BNE Tloop5
 	
 	BX LR
-	
+
+; This is the timer used for flashing the LEDs at the proper frequency before the game starts
+; It also handles the buttons being pressed
 Timer2
 	PUSH{LR}
+    ; Load in the timer value
 	LDR R1, =0xE000E000
-	LDR R0, =1D6136	;the number of iterations 8000
+	LDR R0, =0x1D6136
 	STR R0, [R1, #0x14]
-	MOV R0, #1				;start timer
+    ; Start the timer
+	MOV R0, #1	
 	STR R0, [R1, #0x10]
 	B Tloop2
 	
 Tloop2
+    ; Wait 5ms for checking the buttons
 	BL Timer5
 	
-	;code to check pin D for sw1#0x1 and sw2#0x2
-	LDR R1, =PD ;sw 1
+	; Code to check pin D for sw1 = x1 and sw2 = 0x2
+	LDR R1, =PD
 	LDR R0, [R1, #0x3FC] ; Load data for external switches
 	AND R1, R0, #0x3
 	
-	;Now we check our 
-	CMP R1, #0x1 ; Check for sw1
-	ITT EQ ;jump if not equal
+	; Now we check for switch 1 being pressed
+    ; And set R5 to on if it is
+    ; If either switch is pressed, we need to start the random timer
+    ; Which will let us generate a random value to use with the round start delay
+	CMP R1, #0x1
+    ITT EQ
 	MOVEQ R5, #0x10
 	BLEQ StartRandomTimer
-	
-	CMP R1, #0x2 ;check for sw2
-	ITT EQ ;jump if not equal
+
+    ; Now we check for switch 2 being pressed
+    ; And set R6 to on if it is 
+	CMP R1, #0x2
+	ITT EQ 
 	MOVEQ R6, #0x20
 	BLEQ StartRandomTimer
-	
+
+    ; After checking the switches, check the timer value
 	LDR R1, =0xE000E000
 	ldr R10, [R1, #0x10]		;load time in to see if it is ready yet
 	MOV R0, #0x1
 	CMP R0, R10, LSR #16		;check to see if 1
 	BNE Tloop2
 	
-	MOV R0, #0				;stop timer
+    ; Stop the timer when finished and pop back
+	MOV R0, #0
 	STR R0, [R1, #0x10]
 	POP{LR}
 	BX LR
-	
+
+; The random timer continuously loops around from 0xFFFF
+; When the second button is pressed, the current count value is found and scaled up to get a random interval between 0 and 1 second
+; That interval is added to 1 second which gives us a delay between 1 and 2 seconds
 StartRandomTimer
+    ; If both buttons have been pressed
+    ; There is nothing to do here, so go back
 	ORR R0, R5, R6
 	CMP R0, #0x30
 	BXEQ LR
 
+    ; Load the delay into timer 2a and start it 
 	LDR R1, =T2
-	LDR R0, =DELAY5		;the number of iterations 8000
+	LDR R0, =DELAY5
 	STR R0, [R1, #0x2C]
-	MOV R0, #0x1				;start timer
+	MOV R0, #0x1
 	STR R0, [R1, #0xC]
 
 	BX LR
 	
-
+; Beginning of the game
+; Find the random time value, then
+; Start the players in the middle and split them up after the delay
 StartGame
 	; Load the random time value from T2A
 	LDR R1, =T2
@@ -235,19 +258,25 @@ StartGame
 
 	B MoveDelay
 
-
+; Wait the random time before splitting up the players before the next round
 MoveDelay
+    ; Set up the timer
 	LDR R5, =CP
+    ; Clear the timer
 	MOV R0, #0
 	STR R0, [R5, #0x10]
-	LDR R0, =0x3AC26C ; 1 Second
+    ; Load 1 second, and add it to our random value
+	LDR R0, =0x3AC26C 
 	ADD R0, R11
+    ; Then set the time value
 	STR R0, [R5, #0x14]
+    ; Configure the timer and start it
 	MOV R0, #0
 	STR R0, [R5, #0x18]
 	MOV R0, #0x5
 	STR R0, [R5, #0x10]
 
+; Wait for the timer to finish, then split the LEDs up
 MoveDelayLoop
 	LDRB R0, [R5, #0x12]
 	MOV R1, #0x1
@@ -257,6 +286,7 @@ MoveDelayLoop
 	B MoveDelayLoop
 
 
+; Shift the left LED left, and the right one right
 MoveApart
 	LSL R2, R2, #1
 	LSR R3, R3, #1
@@ -265,24 +295,32 @@ MoveApart
 
 	B FirstRace
 
-
+; Wait for the first person to press their button
 FirstRace
 	LDR R4, =PD
 	LDR R0, [R4, #0x3FC] ; Load data for switches
 
+    ; Only want to look at the first two bits
 	AND R1, R0, #0x3
 
+    ; If button one is pressed, move player 2 forward
 	CMP R1, #0x1
 	BEQ MovePlayer2
 
+    ; If button two is pressed, move player 1 forward
 	CMP R1, #0x2
 	BEQ MovePlayer1
 	
+    ; Otherwise, wait 5ms for the button delay, then check again
 	BL Timer5
 	B FirstRace
 
 
+; Player 1 won the race, so shift them forward, then start a timer
+; That timer will be the time to wait for player 2 to press their button
+; Before player 1 wins the round
 MovePlayer1
+    ; Move the player over
 	LSR R2, R2, #1
 	BL SetLEDs
 
@@ -291,50 +329,67 @@ MovePlayer1
 	MOV R0, #0
 	STR R0, [R5, #0x10]
 	
+    ; Check the DIP switch value for the time for player 1
 	LDR R0, [R4, #0x3FC] ; Load data for switches
 	AND R1, R0, #0xC0
 	LSR R1, #6
 	
+    ; Set the timer delay based on the number of draws, and the switch value
 	BL SetRoundDelay
 	
+    ; Start the timer
 	MOV R0, #0
 	STR R0, [R5, #0x18]
 	MOV R0, #0x5
 	STR R0, [R5, #0x10]
 
+; Wait for player two to press their button, or the timer to expire
 WaitForPlayer2
+    ; Check if the timer is finished
 	LDRB R0, [R5, #0x12]
 	MOV R1, #0x1
 	CMP R0, R1
 	BEQ Player1WonRound
 
+    ; Check for the other player pressing their button
 	LDR R0, [R4, #0x3FC] ; Load data for switches
 	AND R1, R0, #0x3
 
+    ; If they did, then it's a draw
 	CMP R1, #0x1
 	BEQ Draw1
+
 	BL Timer5
 	B WaitForPlayer2
 
+; The timer expired, so player 1 won the round
 Player1WonRound
+    ; Advance them forward again
 	LSR R2, R2, #1
 	BL SetLEDs
-
+    
+    ; Then check if the player has been pushed to the edge, and end the game if they have
 	CMP R3, #0x1
 	BEQ GameOver
 
 	B MoveDelay
 	
+; The round was a draw
 Draw1
+    ; Move the other player back
 	LSL R3, R3, #1
 	BL SetLEDs
 	
+    ; And increment the number of draws
 	ADD R12, #1
 	
 	B MoveDelay
 
-
+; Player 1 won the race, so shift them forward, then start a timer
+; That timer will be the time to wait for player 2 to press their button
+; Before player 1 wins the round
 MovePlayer2
+    ; Move the player over
 	LSL R3, R3, #1
 	BL SetLEDs
 
@@ -343,6 +398,7 @@ MovePlayer2
 	MOV R0, #0
 	STR R0, [R5, #0x10]
 	
+    ; Check the DIP switch value for the time for player 2
 	LDR R0, [R4, #0x3FC] ; Load data for switches
 	AND R1, R0, #0xC
 	LSR R1, #2
