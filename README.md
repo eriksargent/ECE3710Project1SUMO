@@ -74,6 +74,9 @@ The screenshots from the logic analyzer below show the verification of the delay
 ##Conclusion
 In conclusion we have been able to create a working prototype for the SUMO game as shown in our design document. Testing our project with a logic analyzer we were able to meet the qualifications of the 2Hz flashing LED, 5ms button sampling, and enable a random timer for each turn. We also verified the change in the race delay from the number of draws and the programmed value from the DIP switches. 
 
+##Demonstration
+[Video](https://www.youtube.com/watch?v=0swOUcunWD8)
+
 ##Source Code
 ```nasm
 	   THUMB
