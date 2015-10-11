@@ -1,5 +1,5 @@
 # ECE 3710 Project 1 - SUMO
-**Erik Sargent and Westen Jensen**  
+**Erik Sargent and Weston Jensen**  
 October 13, 2015
 
 
@@ -64,7 +64,7 @@ The `Move` state is where the players race against each other to press their but
 In the `End Game` state, the LEDs flash at 2Hz at their current position at one end of the board to indicate the game is over, and which player was victorious. If at any time the reset is pressed, the program starts over and begins at the setup state. 
 
 ######Figure 2 - Program Flow Chart
-![](flow.png)
+![](Flow.png)
 
 ##Testing
 The screenshots from the logic analyzer below show the verification of the delay for player races. They were taken with different programmed values from the DIP switches.
