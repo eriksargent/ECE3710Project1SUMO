@@ -343,7 +343,7 @@ MovePlayer1
 	MOV R0, #0x5
 	STR R0, [R5, #0x10]
 
-; Wait for player two to press their button, or the timer to expire
+; Wait for player 2 to press their button, or the timer to expire
 WaitForPlayer2
     ; Check if the timer is finished
 	LDRB R0, [R5, #0x12]
@@ -403,112 +403,148 @@ MovePlayer2
 	AND R1, R0, #0xC
 	LSR R1, #2
 	
+	; Set the timer delay based on the number of draws, and the switch value
 	BL SetRoundDelay
 	
 	LSR R1, R0
 	
+	; Start the timer
 	MOV R0, #0
 	STR R0, [R5, #0x18]
 	MOV R0, #0x5
 	STR R0, [R5, #0x10]
 
+; Wait for player 1 to press their button, or the timer to expire
 WaitForPlayer1
+	; Check if the timer is finished
 	LDRB R0, [R5, #0x12]
 	MOV R1, #0x1
 	CMP R0, R1
 	BEQ Player2WonRound
 
+	; Check for the other player pressing their button
 	LDR R0, [R4, #0x3FC] ; Load data for switches
 	AND R1, R0, #0x3
 
+	; If they did, then it's a draw
 	CMP R1, #0x2
 	BEQ Draw2
 	BL Timer5
 	B WaitForPlayer1
 
+; The timer expired, so player 2 won the round
 Player2WonRound
+	; Advance them forward again
 	LSL R3, R3, #1
 	BL SetLEDs
 
+	; Then check if the player has been pushed to the edge, and end the game if they have
 	MOV R0, #0x200
 	CMP R2, R0
 	BEQ GameOver
 
 	B MoveDelay
 	
+; The round was a draw
 Draw2
+	; Move the other player back
 	LSR R2, R2, #1
 	BL SetLEDs
 	
+	; And increment the number of draws
 	ADD R12, #1
 
 	B MoveDelay
 	
+; Set the delay for the round based on the number 
+; of draws, and the programmed speed from the DIP switches
 SetRoundDelay
 ; Note: Delay for the player needs to be in R1
 ; and R5 should contain the address to the timer
+
+	; (320 – 80Sn)
 	MOV R0, #80
 	MUL R1, R0
 	MOV R0, #320
 	SUB R1, R0, R1
 	
+	; min(d,4)
 	MOV R0, #4
 	CMP R0, R12
 	IT LS
 	MOVLS R0, R12
 	
-	LSR R1, R0
+	; Divide by 2 raised to the number found previously
+	LSR R1, R1, R0 ; VERIFY THIS WORKS!!!
 	
+	; Multiply by 1ms
 	LDR R0, =0x03FC68
 	MUL R1, R0
-	
+		
+	; Load that value into the timer
 	STR R1, [R5, #0x14]
 	
 	BX LR
 	
-
+; The game is finished
 GameOver
+	; Store a copy of the ending player state
+	; This if for the flashing, so the lights
+	; Flash at their current location, rather
+	; than in the middle
 	MOV R5, R2
 	MOV R6, R3
-EndFlash;reset was just pressed
+; Flash the lights in their final location
+EndFlash
+	; Move the ending state into the lights (on)
 	MOV R2, R5
-	MOV R3, R6; turn on led 6
+	MOV R3, R6
 	BL SetLEDs
-		
+	
+	; Delay
 	BL EndTimer
-		
-	MOV R2, #0x0; turn them off
+	
+	; Move 0s into the lights (off)		
+	MOV R2, #0x0
 	MOV R3, #0x0
 	BL SetLEDs
 	
+	; Delay again
 	BL EndTimer
 	
+	; And repeat
 	B EndFlash
 	
-	
+; Configure timer for the end flash delay
 EndTimer
 	PUSH{LR}
-	LDR R1, =0xE000E000
-	LDR R0, =0x1D6136	;the number of iterations 8000
-	STR R0, [R1, #0x14]
-	MOV R0, #1				;start timer
-	STR R0, [R1, #0x10]
+	LDR R1, =0xE000E000  ; Timer location
+	LDR R0, =0x1D6136    ; Flash delay
+	STR R0, [R1, #0x14]  ; Write the delay value to the timer
+	MOV R0, #1			
+	STR R0, [R1, #0x10]  ; Start the timer
 	B EndTloop
 	
+; Wait for end flash delay timer to expire
 EndTloop
+	; Load in finished value
 	LDR R1, =0xE000E000
-	ldr R10, [R1, #0x10]		;load time in to see if it is ready yet
+	ldr R10, [R1, #0x10]
 	MOV R0, #0x1
-	CMP R0, R10, LSR #16		;check to see if 1
+
+	; Test it for 1 (finished)
+	CMP R0, R10, LSR #16
+	; Do it again if not yet finished
 	BNE EndTloop
 	
-	MOV R0, #0				;stop timer
+	; Otherwise, stop the timer, and return
+	MOV R0, #0
 	STR R0, [R1, #0x10]
+
 	POP{LR}
 	BX LR
 
-
-
+; Light up the proper LED segments
 SetLEDs
 	;2^0 -> B5
 	;2^1 -> B0
@@ -522,7 +558,7 @@ SetLEDs
 	;2^9 -> E1
 
 	;A pins
-	MOV R0, #0   		; Clear out the value in R0
+	MOV R0, #0     ; Clear out the value in R0
 	ORR R1, R2, R3 ; Get the value to set to the LEDs
 
 	;A5
@@ -547,7 +583,7 @@ SetLEDs
 
 
 	;B pins
-	MOV R0, #0   		; Clear out the value in R0
+	MOV R0, #0     ; Clear out the value in R0
 	ORR R1, R2, R3 ; Get the value to set to the LEDs
 
 	;B5
@@ -577,7 +613,7 @@ SetLEDs
 
 
 	;E pins
-	MOV R0, #0   		; Clear out the value in R0
+	MOV R0, #0     ; Clear out the value in R0
 	ORR R1, R2, R3 ; Get the value to set to the LEDs
 
 	;E4
