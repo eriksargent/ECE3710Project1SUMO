@@ -43,7 +43,7 @@ Upon power-up or reset the game shall start with the two middle LED’s flashing
 SUMO is implemented on a Tiva C Series TM4C123G microcontroller board. The output is displayed on a 10 LED bar graph display. A total of 3 buttons are used, there are 2 external buttons for player one and player two to play the game, and the reset button which is located on the board to reset the game once completed. A 4 position DIP switch is used for the players to enter in the difficulty level they would like to use, each player can use the switches to input a 2 bit number which is used in the formula to calculate how long of a delay should be used each round. See Figure 1. for an illustration of how the hardware should be laid out.
 
 ######Figure 1 - Hardware Design
-![](hardware.png)
+![](hardware.jpg)
 
 ###Software Design
 The software was broken up into 5 different sections: `Setup`, `Pre Game`, `Game`, `Move`, and `End Game`. Below in Figure 2 is a flow chart of how the game proceeds through the code. 
@@ -556,7 +556,7 @@ SetRoundDelay
 	MOVLS R0, R12
 	
 	; Divide by 2 raised to the number found previously
-	LSR R1, R1, R0 ; VERIFY THIS WORKS!!!
+	LSR R1, R1, R0
 	
 	; Multiply by 1ms
 	LDR R0, =0x03FC68
