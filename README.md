@@ -40,13 +40,16 @@ Upon power-up or reset the game shall start with the two middle LED’s flashing
 
 ##Design Details
 ###Hardware Design
-SUMO is implemented on a Tiva C Series TM4C123G microcontroller board. The output is displayed on a 10 LED bar graph display. A total of 3 buttons are used, there are 2 external buttons for player one and player two to play the game, and the reset button which is located on the board to reset the game once completed. A 4 position DIP switch is used for the players to enter in the difficulty level they would like to use, each player can use the switches to input a 2 bit number which is used in the formula to calculate how long of a delay should be used each round. See Figure 1. for an illustration of how the hardware should be laid out.
+SUMO is implemented on a Tiva C Series TM4C123G microcontroller board. The output is displayed on a 10 LED bar graph display. A total of 3 buttons are used, there are 2 external buttons for player one and player two to play the game, and the reset button which is located on the board to reset the game once completed. A 4 position DIP switch is used for the players to enter in the difficulty level they would like to use, each player can use the switches to input a 2 bit number which is used in the formula to calculate how long of a delay should be used each round. See Figure 1. for an illustration of how the hardware should be laid out. Figure 2 shows the schematic for how the system should be wired to the microcontroller pins.
 
 ######Figure 1 - Hardware Design
 ![](hardware.jpg)
 
+######Figure 2 - Hardware Schematic
+![](Schematic.png)
+
 ###Software Design
-The software was broken up into 5 different sections: `Setup`, `Pre Game`, `Game`, `Move`, and `End Game`. Below in Figure 2 is a flow chart of how the game proceeds through the code. 
+The software was broken up into 5 different sections: `Setup`, `Pre Game`, `Game`, `Move`, and `End Game`. Below in Figure 3 is a flow chart of how the game proceeds through the code. 
 
 #####Setup
 In setup section all timers, clocks, and GPIO ports are configured and enabled for the game. After `Setup`, the program will enter the `Pre Game` state.
@@ -63,7 +66,7 @@ The `Move` state is where the players race against each other to press their but
 #####End Game
 In the `End Game` state, the LEDs flash at 2Hz at their current position at one end of the board to indicate the game is over, and which player was victorious. If at any time the reset is pressed, the program starts over and begins at the setup state. 
 
-######Figure 2 - Program Flow Chart
+######Figure 3 - Program Flow Chart
 ![](Flow.png)
 
 ##Testing
